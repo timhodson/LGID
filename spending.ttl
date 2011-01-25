@@ -1,0 +1,197 @@
+@base <http://dev.local/puelia/api-config#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dcterms: <http://purl.org/dc/terms/>.
+@prefix api: <http://purl.org/linked-data/api/vocab#> .
+@prefix gc: <http://puelia-php.googlecode.com/svn/trunk/documents/config.ttl#> .
+@prefix rel: <http://vocab.org/relationship/> .
+@prefix spec: <http://www.epimorphics.com/examples/specSchools#> .
+@prefix climb: <http://climb.dataincubator.org/vocabs/climb/> .
+@prefix space: <http://purl.org/net/schemas/space/> .
+@prefix payment: <http://reference.data.gov.uk/def/payment#> .
+@prefix org: <http://www.w3.org/ns/org#> .
+@prefix doap: <http://usefulinc.com/ns/doap#> .
+@prefix admingeo: <http://statistics.data.gov.uk/def/administrative-geography/> .
+@prefix interval: <http://reference.data.gov.uk/def/intervals/>
+
+<#SpendingAPI> a api:API ;
+    rdfs:label "Local Authority Spending Data"@en ;
+    api:maxPageSize "50";
+    api:defaultPageSize "10" ;
+    api:endpoint [
+        a api:ItemEndpoint ;
+        api:uriTemplate "/payment/{snac_code}/{payment_id}" ;
+        api:itemTemplate "http://id.spending.esd.org.uk/Payment/{snac_code}/{payment_id}"
+        ],
+	<#councilList>,
+	<#councilYearList>,
+	<#paymentYearList>,
+	<#paymentYearCouncilList>;
+    api:sparqlEndpoint <http://api.talis.com/stores/lga-aggregate/services/sparql> ;
+    api:defaultViewer api:describeViewer ;
+    api:defaultFormatter api:JsonFormatter ;
+    api:contentNegotiation api:suffixBased;
+    api:variable [
+        a api:Variable;
+        api:name "snac" ;
+        api:value ""
+        ],
+        [
+        a api:Variable;
+        api:name "base";
+        api:value "http://id.spending.esd.org.uk/"
+        ],
+	[
+	a api:Variable ;
+	api:name "council" ;
+        api:value "" ;
+	]
+        ;
+    .
+
+
+##########################################
+# List Endpoints
+##########################################
+
+# all councils with payments
+#	return councils who are associated with at least one payment
+#     	detail council, district, name, sum payments?
+# /council
+<#councilList> a api:ListEndpoint ;
+		api:uriTemplate "/council" ;
+		api:defaultViewer api:describeViewer ;
+		api:defaultFormatter api:JsonFormatter ;
+		api:selector [
+		    api:select """
+			select distinct ?item {
+			?p payment:payer ?item .
+			}
+		    """ 
+		] .
+
+# all councils with payments in year x
+#	return councils who are associated with at least one payment which has a date in given year
+#	detail council, district, name
+# /council/{year}
+<#councilYearList> a api:ListEndpoint ;
+		api:uriTemplate "/council/{year}" ;
+		api:defaultViewer api:describeViewer ;
+		api:defaultFormatter api:JsonFormatter ;
+                api:variable [
+                    a api:Variable ;
+                    api:name "year" ;
+                    ];
+		api:selector [
+		    api:select """
+                        select distinct ?item
+                        {
+                        ?s a payment:Payment ;
+                            payment:payer ?item;
+                            payment:date ?date .
+                        ?date interval:ordinalYear ?year .
+                        }
+                    """
+		] .
+
+# all payments in year x
+#	return payments which occured within year x.
+# 	detail the payment.
+# /payment/{year}
+<#paymentYearList> a api:ListEndpoint ;
+		api:uriTemplate "/payment/{year}" ;
+		api:defaultViewer api:describeViewer ;
+		api:defaultFormatter api:JsonFormatter ;
+		api:selector [
+		    api:where "?item a payment:Payment ; payment:date ?date . ?date interval:ordinalYear {year} ." 
+		] .
+		
+		
+# payments for council x in year y
+#	return payments for a given council in a given year
+# 	detail the payment
+# /payment/{year}/{council}
+<#paymentYearCouncilList> a api:ListEndpoint ;
+		api:uriTemplate "/payment/{year}/{snac}" ;
+		api:defaultViewer api:describeViewer ;
+		api:defaultFormatter api:JsonFormatter ;
+		api:selector [
+		    api:where """	?item a payment:Payment ;
+				    payment:date ?date ;
+				    payment:payer ?c .
+				?date interval:ordinalYear {year} .
+				?c skos:notation "{snac}" .
+				""" 
+		] .
+
+
+# category ??? useful? any data to support?
+# 	return categories as a list
+# /category
+
+
+# narrative ??? useful?
+#	return narratives as a list.
+# /narrative
+
+
+##########################################
+# item Endpoints
+##########################################
+
+
+
+##########################################
+# Viewers
+##########################################
+
+<#payeeViewer>
+    api:name "payee";
+    api:property payment:payee, payment:totalNetAmount, rdfs:label ;
+    api:properties "Payee.label" .
+
+<#payerViewer>
+    api:name "payer";
+    api:property payment:payer, payment:totalNetAmount, rdfs:label ;
+    api:properties "Payer.label" .
+
+<#organisation>
+    api:name "Organisation";
+    api:property ( org:Organisation rdfs:label ) .
+
+
+##########################################
+# Formatters
+##########################################
+
+
+<#html> a api:XsltFormatter ;
+        api:name "html" ;
+        api:mimetype "text/html" ;
+        api:stylesheet "views/xslt-styles/result.xsl" .
+
+<#csv> a api:XsltFormatter ;
+        api:name "csv" ;
+        api:mimetype "text/csv" ;
+        api:stylesheet "views/xslt-styles/csv.xsl" .
+
+
+
+##########################################
+# Vocabs
+##########################################
+
+
+payment:payer a rdfs:Property ; api:label "Payer" .
+payment:payee a rdfs:Property ; api:label "Payee" .
+payment:totalNetAmount a rdfs:Property ; api:label "Amount"  .
+payment:Payment a rdfs:Class ; api:label "Payment" .
+admingeo:LocalAuthority a rdfs:Class ; api:label "Local Authority" .
+
+rdf:value a rdf:Property ; api:label "value" .
+rdfs:label a rdf:Property ; api:label "label" .
+rdf:type a rdf:Property ; api:label "type" .
