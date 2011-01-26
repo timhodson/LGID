@@ -84,7 +84,8 @@
 		api:defaultFormatter api:JsonFormatter ;
                 api:variable [
                     a api:Variable ;
-                    api:name "year" ;
+                    api:name "/council/{year}" ;
+
                     ];
 		api:selector [
 		    api:select """
@@ -104,10 +105,17 @@
 # /payment/{year}
 <#paymentYearList> a api:ListEndpoint ;
 		api:uriTemplate "/payment/{year}" ;
-		api:defaultViewer api:describeViewer ;
+            	api:defaultViewer api:describeViewer ;
 		api:defaultFormatter api:JsonFormatter ;
-		api:selector [
-		    api:where "?item a payment:Payment ; payment:date ?date . ?date interval:ordinalYear {year} ." 
+		api:variable [
+                    a api:Variable ;
+                    api:name "inYear";
+                    api:value "{year}" ;
+                    api:type xsd:integer
+                    ];
+                api:selector [
+                    api:filter "type=Payment&date.ordinalYear={inYear}"
+#api:where "?item a payment:Payment ; payment:date ?date . ?date interval:ordinalYear {year} ."
 		] .
 		
 		
@@ -188,9 +196,12 @@
 
 payment:payer a rdfs:Property ; api:label "Payer" .
 payment:payee a rdfs:Property ; api:label "Payee" .
+payment:date a rdfs:Property ; api:label "date" .
 payment:totalNetAmount a rdfs:Property ; api:label "Amount"  .
-payment:Payment a rdfs:Class ; api:label "Payment" .
-admingeo:LocalAuthority a rdfs:Class ; api:label "Local Authority" .
+payment:Payment a rdf:Class ; api:label "Payment" .
+admingeo:LocalAuthority a rdf:Class ; api:label "Local Authority" .
+
+interval:ordinalYear a rdfs:Property ; api:label "ordinalYear" .
 
 rdf:value a rdf:Property ; api:label "value" .
 rdfs:label a rdf:Property ; api:label "label" .
