@@ -17,16 +17,13 @@
 @prefix doap: <http://usefulinc.com/ns/doap#> .
 @prefix admingeo: <http://statistics.data.gov.uk/def/administrative-geography/> .
 @prefix interval: <http://reference.data.gov.uk/def/intervals/>
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 
 <#SpendingAPI> a api:API ;
     rdfs:label "Local Authority Spending Data"@en ;
     api:maxPageSize "50";
     api:defaultPageSize "10" ;
-    api:endpoint [
-        a api:ItemEndpoint ;
-        api:uriTemplate "/payment/{snac_code}/{payment_id}" ;
-        api:itemTemplate "http://id.spending.esd.org.uk/Payment/{snac_code}/{payment_id}"
-        ],
+    api:endpoint 
 	<#councilList>,
 	<#councilYearList>,
 	<#paymentYearList>,
@@ -61,9 +58,9 @@
 # all councils with payments
 #	return councils who are associated with at least one payment
 #     	detail council, district, name, sum payments?
-# /council
+# /councils
 <#councilList> a api:ListEndpoint ;
-		api:uriTemplate "/council" ;
+		api:uriTemplate "/councils" ;
 		api:defaultViewer api:describeViewer ;
 		api:defaultFormatter api:JsonFormatter ;
 		api:selector [
@@ -74,30 +71,31 @@
 		    """ 
 		] .
 
-# all councils with payments in year x
-#	return councils who are associated with at least one payment which has a date in given year
+# all payments for all councils in year x
+#	return all payments for all councils in year x
 #	detail council, district, name
 # /council/{year}
-<#councilYearList> a api:ListEndpoint ;
-		api:uriTemplate "/council/{year}" ;
-		api:defaultViewer api:describeViewer ;
-		api:defaultFormatter api:JsonFormatter ;
-                api:variable [
-                    a api:Variable ;
-                    api:name "/council/{year}" ;
+#<#councilYearList> a api:ListEndpoint ;
+#		api:uriTemplate "/council/{year}" ;
+#		api:defaultViewer api:describeViewer ;
+#		api:defaultFormatter api:JsonFormatter ;
+ #               api:variable [
+#                    a api:Variable ;
+#                    api:name "inYear";
+#                    api:value "{year}" ;
+#                    api:type xsd:integer
+#                    ];
+#		api:selector [
+#		    api:select """
+#                       select distinct ?item
+#                        {
+#                        ?item a payment:Payment ;
+#                               payment:date ?date .
+#                        ?date interval:ordinalYear ?inYear .
+#                        }
+#                    """
+#		] .
 
-                    ];
-		api:selector [
-		    api:select """
-                        select distinct ?item
-                        {
-                        ?s a payment:Payment ;
-                            payment:payer ?item;
-                            payment:date ?date .
-                        ?date interval:ordinalYear ?year .
-                        }
-                    """
-		] .
 
 # all payments in year x
 #	return payments which occured within year x.
@@ -114,9 +112,16 @@
                     api:type xsd:integer
                     ];
                 api:selector [
-                    api:filter "type=Payment&date.ordinalYear={inYear}"
-#api:where "?item a payment:Payment ; payment:date ?date . ?date interval:ordinalYear {year} ."
-		] .
+                    api:where """ ?item a payment:Payment ;
+                                        payment:date ?date ;
+                                        payment:totalNetAmount ?amount.
+                                   ?date interval:ordinalYear ?inYear.""" ;
+                    api:orderBy "DESC(xsd:decimal(?amount))"
+
+                    #api:sort "-Amount" ; # sort doesn't seem to by datatype-able
+                    #api:filter "type=Payment&date.ordinalYear={inYear}" ;
+
+                    ] .
 		
 		
 # payments for council x in year y
@@ -127,13 +132,28 @@
 		api:uriTemplate "/payment/{year}/{snac}" ;
 		api:defaultViewer api:describeViewer ;
 		api:defaultFormatter api:JsonFormatter ;
+                api:variable [
+                    a api:Variable ;
+                    api:name "inYear";
+                    api:value "{year}" ;
+                    api:type xsd:integer
+                    ],
+                    [
+                    a api:Variable ;
+                    api:name "snac_code";
+                    api:value "{snac}" ;
+                    api:type <http://statistics.data.gov.uk/def/administrative-geography/StandardCode>
+                    ];
 		api:selector [
-		    api:where """	?item a payment:Payment ;
+		    api:where """?item a payment:Payment ;
 				    payment:date ?date ;
-				    payment:payer ?c .
-				?date interval:ordinalYear {year} .
-				?c skos:notation "{snac}" .
-				""" 
+				    payment:payer ?c ;
+                                    payment:totalNetAmount ?amount.
+
+				?c skos:notation ?snac_code .
+				?date interval:ordinalYear ?inYear .
+				""" ;
+                    api:orderBy "DESC(xsd:decimal(?amount))"
 		] .
 
 
@@ -193,12 +213,12 @@
 # Vocabs
 ##########################################
 
-
+payment:Payment a rdf:Class ; api:label "Payment" .
 payment:payer a rdfs:Property ; api:label "Payer" .
 payment:payee a rdfs:Property ; api:label "Payee" .
 payment:date a rdfs:Property ; api:label "date" .
-payment:totalNetAmount a rdfs:Property ; api:label "Amount"  .
-payment:Payment a rdf:Class ; api:label "Payment" .
+payment:totalNetAmount a rdfs:Property ; rdfs:range xsd:decimal ; api:label "Amount"  .
+
 admingeo:LocalAuthority a rdf:Class ; api:label "Local Authority" .
 
 interval:ordinalYear a rdfs:Property ; api:label "ordinalYear" .
