@@ -1,7 +1,7 @@
-@base <http://dev.local/puelia/api-config#> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
 @prefix dc: <http://purl.org/dc/elements/1.1/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
@@ -15,40 +15,42 @@
 @prefix payment: <http://reference.data.gov.uk/def/payment#> .
 @prefix org: <http://www.w3.org/ns/org#> .
 @prefix doap: <http://usefulinc.com/ns/doap#> .
-@prefix admingeo: <http://statistics.data.gov.uk/def/administrative-geography/> .
-@prefix interval: <http://reference.data.gov.uk/def/intervals/>
-@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix administrative-geography: <http://statistics.data.gov.uk/def/administrative-geography/> .
+@prefix admingeo: <http://data.ordnancesurvey.co.uk/ontology/admingeo/> .
+@prefix interval: <http://reference.data.gov.uk/def/intervals/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix spec: <http://dev.local/puelia/api-config#> .
 
-<#SpendingAPI> a api:API ;
-    rdfs:label "Local Authority Spending Data"@en ;
-    api:maxPageSize "50";
-    api:defaultPageSize "10" ;
-    api:endpoint 
-	<#councilList>,
-	<#councilYearList>,
-	<#paymentYearList>,
-	<#paymentYearCouncilList>;
-    api:sparqlEndpoint <http://api.talis.com/stores/lga-aggregate/services/sparql> ;
-    api:defaultViewer api:describeViewer ;
-    api:defaultFormatter api:JsonFormatter ;
-    api:contentNegotiation api:suffixBased;
-    api:variable [
-        a api:Variable;
-        api:name "snac" ;
-        api:value ""
-        ],
-        [
-        a api:Variable;
-        api:name "base";
-        api:value "http://id.spending.esd.org.uk/"
-        ],
-	[
-	a api:Variable ;
-	api:name "council" ;
-        api:value "" ;
-	]
-        ;
-    .
+spec:SpendingAPI 
+    a
+	api:API ;
+    rdfs:label 
+    	"Local Authority Spending Data"@en ;
+    api:maxPageSize 
+    	"500";
+    api:defaultPageSize 
+    	"100" ;
+    api:endpoint
+		spec:councilList ,
+		spec:councilPaymentsList ,
+		spec:councilPaymentsYearList ,
+		spec:councilPaymentsMonthList ,
+		spec:paymentYearList ,
+		spec:paymentYearMonthList ;
+    api:sparqlEndpoint 
+    	<http://api.talis.com/stores/lga-aggregate/services/sparql> ;
+    api:defaultViewer 
+    	api:describeViewer ;
+    api:viewer 
+       	spec:minimalViewer , 
+    	spec:labelViewer ,
+    	spec:payerViewer ,
+    	spec:paymentViewer ;
+    api:defaultFormatter 
+    	api:JsonFormatter ;
+    api:contentNegotiation 
+    	api:suffixBased 
+    	.
 
 
 ##########################################
@@ -56,119 +58,171 @@
 ##########################################
 
 # all councils with payments
-#	return councils who are associated with at least one payment
-#     	detail council, district, name, sum payments?
+#
 # /councils
-<#councilList> a api:ListEndpoint ;
+
+spec:councilList a api:ListEndpoint ;
 		api:uriTemplate "/councils" ;
 		api:defaultViewer api:describeViewer ;
 		api:defaultFormatter api:JsonFormatter ;
+		api:viewer 
+			spec:labelViewer , 
+			spec:minimalViewer ,
+			spec:payerViewer ;
 		api:selector [
-		    api:select """
-			select distinct ?item {
-			?p payment:payer ?item .
-			}
-		    """ 
-		] .
-
-# all payments for all councils in year x
-#	return all payments for all councils in year x
-#	detail council, district, name
-# /council/{year}
-#<#councilYearList> a api:ListEndpoint ;
-#		api:uriTemplate "/council/{year}" ;
-#		api:defaultViewer api:describeViewer ;
-#		api:defaultFormatter api:JsonFormatter ;
- #               api:variable [
-#                    a api:Variable ;
-#                    api:name "inYear";
-#                    api:value "{year}" ;
-#                    api:type xsd:integer
-#                    ];
-#		api:selector [
-#		    api:select """
-#                       select distinct ?item
-#                        {
-#                        ?item a payment:Payment ;
-#                               payment:date ?date .
-#                        ?date interval:ordinalYear ?inYear .
-#                        }
-#                    """
-#		] .
+    		api:where "{ ?p payment:payer ?item }" ;
+ 		] .		
 
 
-# all payments in year x
-#	return payments which occured within year x.
-# 	detail the payment.
-# /payment/{year}
-<#paymentYearList> a api:ListEndpoint ;
-		api:uriTemplate "/payment/{year}" ;
-            	api:defaultViewer api:describeViewer ;
-		api:defaultFormatter api:JsonFormatter ;
-		api:variable [
-                    a api:Variable ;
-                    api:name "inYear";
-                    api:value "{year}" ;
-                    api:type xsd:integer
-                    ];
-                api:selector [
-                    api:where """ ?item a payment:Payment ;
-                                        payment:date ?date ;
-                                        payment:totalNetAmount ?amount.
-                                   ?date interval:ordinalYear ?inYear.""" ;
-                    api:orderBy "DESC(xsd:decimal(?amount))"
 
-                    #api:sort "-Amount" ; # sort doesn't seem to by datatype-able
-                    #api:filter "type=Payment&date.ordinalYear={inYear}" ;
+# payments from a council
+#
+# /councils/{snac}
 
-                    ] .
-		
-		
-# payments for council x in year y
-#	return payments for a given council in a given year
-# 	detail the payment
-# /payment/{year}/{council}
-<#paymentYearCouncilList> a api:ListEndpoint ;
-		api:uriTemplate "/payment/{year}/{snac}" ;
+spec:councilPaymentsList a api:ListEndpoint ;
+		api:uriTemplate "/councils/{snac}" ;
+       	api:variable [
+	    	a api:Variable ;
+	    	api:name "snacVar" ;
+	    	api:value "{snac}" ;
+	    	api:type administrative-geography:StandardCode ;
+	  	] ; 		
 		api:defaultViewer api:describeViewer ;
 		api:defaultFormatter api:JsonFormatter ;
-                api:variable [
-                    a api:Variable ;
-                    api:name "inYear";
-                    api:value "{year}" ;
-                    api:type xsd:integer
-                    ],
-                    [
-                    a api:Variable ;
-                    api:name "snac_code";
-                    api:value "{snac}" ;
-                    api:type <http://statistics.data.gov.uk/def/administrative-geography/StandardCode>
-                    ];
+		api:viewer 
+			spec:labelViewer , 
+			spec:minimalViewer ,
+			spec:payerViewer ;
 		api:selector [
-		    api:where """?item a payment:Payment ;
-				    payment:date ?date ;
-				    payment:payer ?c ;
-                                    payment:totalNetAmount ?amount.
+    		api:where "{ ?item payment:payer ?payer . ?payer skos:notation ?snacVar }" ;
+ 		] .	
+ 
+ 
+ 
 
-				?c skos:notation ?snac_code .
-				?date interval:ordinalYear ?inYear .
-				""" ;
-                    api:orderBy "DESC(xsd:decimal(?amount))"
+# payments from a council in a year
+#
+# /councils/{snac}/{year}
+
+spec:councilPaymentsYearList a api:ListEndpoint ;
+		api:uriTemplate "/councils/{snac}/{year}" ;
+       	api:variable [
+	    	a api:Variable ;
+	    	api:name "snacVar" ;
+	    	api:value "{snac}" ;
+	    	api:type administrative-geography:StandardCode ;
+	  	] ; 
+       	api:variable [
+	    	a api:Variable ;
+	    	api:name "yearVar" ;
+	    	api:value "{year}" ;
+	    	api:type xsd:integer ;
+	  	] ; 
+		api:defaultViewer api:describeViewer ;
+		api:viewer 
+			spec:labelViewer , 
+			spec:minimalViewer ,
+			spec:paymentViewer ;
+		api:defaultFormatter api:JsonFormatter ;
+		api:selector [
+		    api:where " { ?item a payment:Payment ; payment:date ?date . ?date interval:ordinalYear ?yearVar . ?item payment:payer ?payer . ?payer skos:notation ?snacVar }" 
+		] .	
+		 		
+ 		
+ 		
+# payments from a council in a month of a year
+#
+# /councils/{snac}/{year}/{month}
+
+spec:councilPaymentsMonthList a api:ListEndpoint ;
+		api:uriTemplate "/councils/{snac}/{year}/{month}" ;
+       	api:variable [
+	    	a api:Variable ;
+	    	api:name "snacVar" ;
+	    	api:value "{snac}" ;
+	    	api:type administrative-geography:StandardCode ;
+	  	] ; 
+       	api:variable [
+	    	a api:Variable ;
+	    	api:name "yearVar" ;
+	    	api:value "{year}" ;
+	    	api:type xsd:integer ;
+	  	] ; 
+	  	api:variable [
+	    	a api:Variable ;
+	    	api:name "monthVar" ;
+	    	api:value "{month}" ;
+	    	api:type xsd:integer ;
+	  	] ; 
+		api:defaultViewer api:describeViewer ;
+		api:viewer 
+			spec:labelViewer , 
+			spec:minimalViewer ,
+			spec:paymentViewer ;
+		api:defaultFormatter api:JsonFormatter ;
+		api:selector [
+		    api:where " { ?item a payment:Payment ; payment:date ?date . ?date interval:ordinalYear ?yearVar ; interval:ordinalMonthOfYear ?monthVar . ?item payment:payer ?payer . ?payer skos:notation ?snacVar }" 
+		] .	
+ 		
+ 		
+ 		
+ 		 		
+# payments of all councils in a year
+#
+# /payments/{year}
+
+spec:paymentYearList a api:ListEndpoint ;
+		api:uriTemplate "/payments/{year}" ;
+       	api:variable [
+	    	a api:Variable ;
+	    	api:name "yearVar" ;
+	    	api:value "{year}" ;
+	    	api:type xsd:integer ;
+	  	] ; 
+		api:defaultViewer api:describeViewer ;
+		api:viewer 
+			spec:labelViewer , 
+			spec:minimalViewer ,
+			spec:paymentViewer ;
+		api:defaultFormatter api:JsonFormatter ;
+		api:selector [
+		    api:where "{ ?item a payment:Payment ; payment:date ?date . ?date interval:ordinalYear ?yearVar } " 
 		] .
+		
+		
+		
+		
+# payments of all councils in a month of a year
+#
+# /payments/{year}/{month}
 
-
-# category ??? useful? any data to support?
-# 	return categories as a list
-# /category
-
-
-# narrative ??? useful?
-#	return narratives as a list.
-# /narrative
-
-
+spec:paymentYearMonthList a api:ListEndpoint ;
+		api:uriTemplate "/payments/{year}/{month}" ;
+       	api:variable [
+	    	a api:Variable ;
+	    	api:name "yearVar" ;
+	    	api:value "{year}" ;
+	    	api:type xsd:integer ;
+	  	] ; 
+	  	api:variable [
+	    	a api:Variable ;
+	    	api:name "monthVar" ;
+	    	api:value "{month}" ;
+	    	api:type xsd:integer ;
+	  	] ; 
+		api:defaultViewer api:describeViewer ;
+		api:viewer 
+			spec:labelViewer , 
+			spec:minimalViewer ,
+			spec:paymentViewer ;
+		api:defaultFormatter api:JsonFormatter ;
+		api:selector [
+		    api:where "{ ?item a payment:Payment ; payment:date ?date . ?date interval:ordinalYear ?yearVar ; interval:ordinalMonthOfYear ?monthVar }" 
+		] .		
+		
+		 		
 ##########################################
-# item Endpoints
+# Item Endpoints
 ##########################################
 
 
@@ -177,52 +231,50 @@
 # Viewers
 ##########################################
 
-<#payeeViewer>
-    api:name "payee";
-    api:property payment:payee, payment:totalNetAmount, rdfs:label ;
-    api:properties "Payee.label" .
+spec:labelViewer 
+	a api:Viewer ;
+	api:name "labelViewer" ;
+	api:properties "label" .
 
-<#payerViewer>
-    api:name "payer";
-    api:property payment:payer, payment:totalNetAmount, rdfs:label ;
-    api:properties "Payer.label" .
+spec:minimalViewer
+	a api:Viewer ;
+ 	api:name "minimalViewer" ;
+  	api:properties "label,prefLabel,altLabel,type" .   
 
-<#organisation>
-    api:name "Organisation";
-    api:property ( org:Organisation rdfs:label ) .
+spec:payerViewer
+  	a api:Viewer ;
+    api:name "payerViewer";
+    api:properties "label,prefLabel,notation" .
 
-
+spec:paymentViewer
+  	a api:Viewer ;
+    api:name "paymentViewer";
+    api:properties "payer.label,payee.label,date,totalNetAmount" .
+    
+        
 ##########################################
 # Formatters
 ##########################################
-
-
-<#html> a api:XsltFormatter ;
-        api:name "html" ;
-        api:mimetype "text/html" ;
-        api:stylesheet "views/xslt-styles/result.xsl" .
-
-<#csv> a api:XsltFormatter ;
-        api:name "csv" ;
-        api:mimetype "text/csv" ;
-        api:stylesheet "views/xslt-styles/csv.xsl" .
-
 
 
 ##########################################
 # Vocabs
 ##########################################
 
-payment:Payment a rdf:Class ; api:label "Payment" .
-payment:payer a rdfs:Property ; api:label "Payer" .
-payment:payee a rdfs:Property ; api:label "Payee" .
-payment:date a rdfs:Property ; api:label "date" .
-payment:totalNetAmount a rdfs:Property ; rdfs:range xsd:decimal ; api:label "Amount"  .
+rdf:type api:label "type" ; api:multiValued true .
 
-admingeo:LocalAuthority a rdf:Class ; api:label "Local Authority" .
+rdfs:label api:label "label" ; api:multiValued true .
+
+skos:prefLabel api:label "prefLabel" .
+skos:altLabel api:label "altLabel" ; api:multiValued true .
+skos:notation api:label "notation" .
+
+payment:payer a rdfs:Property ; api:label "payer" .
+payment:payee a rdfs:Property ; api:label "payee" .
+payment:date a rdfs:Property ; api:label "date" .
+payment:totalNetAmount a rdfs:Property ; api:label "totalNetAmount" .
+payment:Payment a rdf:Class ; api:label "payment" .
+
+admingeo:LocalAuthority a rdf:Class ; api:label "localAuthority" .
 
 interval:ordinalYear a rdfs:Property ; api:label "ordinalYear" .
-
-rdf:value a rdf:Property ; api:label "value" .
-rdfs:label a rdf:Property ; api:label "label" .
-rdf:type a rdf:Property ; api:label "type" .
