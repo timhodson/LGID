@@ -249,7 +249,7 @@ spec:payerViewer
 spec:paymentViewer
   	a api:Viewer ;
     api:name "paymentViewer";
-    api:properties "payer.label,payee.label,date,totalNetAmount" .
+    api:properties "payer.label,payer.notation,payee.label,date.ordinalYear,date.ordinalMonthOfYear,date.ordinalDayOfMonth,totalNetAmount" .
     
         
 ##########################################
@@ -278,3 +278,5 @@ payment:Payment a rdf:Class ; api:label "payment" .
 admingeo:LocalAuthority a rdf:Class ; api:label "localAuthority" .
 
 interval:ordinalYear a rdfs:Property ; api:label "ordinalYear" .
+interval:ordinalMonthOfYear a rdfs:Property ; api:label "ordinalMonthOfYear" .
+interval:ordinalDayOfMonth a rdfs:Property ; api:label "ordinalDayOfMonth" .
